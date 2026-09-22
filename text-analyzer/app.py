@@ -4,14 +4,19 @@ from collections import Counter
 import streamlit as st
 
 
+def clear_text():
+    st.session_state["text_input"] = ""
+
+
 # Page and input form
 st.set_page_config(page_title="Text Analyzer")
 st.title("Text Analyzer")
 st.write("Enter some text to see its basic stats.")
 
 with st.form("text_form"):
-    text = st.text_area("Your text", height=200)
+    text = st.text_area("Your text", height=200, key="text_input")
     submitted = st.form_submit_button("Analyze")
+    st.form_submit_button("Clear", on_click=clear_text)
 
 
 # Analyze only after the form is submitted.
