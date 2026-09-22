@@ -37,6 +37,7 @@ if submitted:
         st.caption("Characters include spaces and line breaks. Sentences are estimated using . ! ?")
 
         st.subheader("Five most common words")
+        # this implementation ensures that words with tied counts have the same ranking
         if common_words:
             rows = []
             previous_count = None
