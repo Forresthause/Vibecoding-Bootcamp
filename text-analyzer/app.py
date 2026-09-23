@@ -19,6 +19,39 @@ with st.form("text_form"):
     st.form_submit_button("Clear", on_click=clear_text)
 
 
+# Keep the multiline input, but let plain Enter submit its existing form.
+# Only trusted, static JavaScript is passed here; user text stays in the widget.
+st.html(
+    """
+    <script>
+    (() => {
+        if (window.textAnalyzerEnterHandler) {
+            document.removeEventListener("keydown", window.textAnalyzerEnterHandler, true);
+        }
+        window.textAnalyzerEnterHandler = (event) => {
+            if (!event.target.matches('.st-key-text_input textarea') ||
+                event.key !== "Enter" || event.shiftKey || event.ctrlKey ||
+                event.metaKey || event.altKey || event.isComposing || event.keyCode === 229) {
+                return;
+            }
+            const form = event.target.closest('[data-testid="stForm"]');
+            const analyzeButton = form?.querySelector('[data-testid="stFormSubmitButton"] button');
+            if (!analyzeButton || analyzeButton.disabled) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.repeat) return;
+            // Blur commits the latest textarea value before submitting the form.
+            event.target.blur();
+            requestAnimationFrame(() => analyzeButton.click());
+        };
+        document.addEventListener("keydown", window.textAnalyzerEnterHandler, true);
+    })();
+    </script>
+    """,
+    unsafe_allow_javascript=True,
+)
+
+
 # Analyze only after the form is submitted.
 if submitted:
     if not text.strip():
