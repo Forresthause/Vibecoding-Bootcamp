@@ -2,12 +2,14 @@
 
 import streamlit as st
 
-from analysis import CSVValidationError, analyze_columns, parse_csv
+from analysis import CSVValidationError, analyze_columns, parse_csv, prepare_plot_data
 
 
 def reset_selection():
     """Start fresh whenever the upload changes or is removed."""
     st.session_state["selected_columns"] = []
+    for key in ("plot_x", "plot_y", "plot_type"):
+        st.session_state.pop(key, None)
 
 
 st.set_page_config(page_title="CSV Analyser")
@@ -52,6 +54,28 @@ else:
                     lambda value: "N/A" if value is None else str(value)
                 )
             st.dataframe(display_results, hide_index=True)
+
+        st.subheader("Plot")
+        st.caption(
+            "Both axes require numeric values. Rows with a blank on either axis "
+            "are omitted. Line plots connect points in ascending X order and "
+            "require unique X values."
+        )
+        x_column = st.selectbox("X column", data.columns.tolist(), key="plot_x")
+        y_column = st.selectbox(
+            "Y column", data.columns.tolist(),
+            index=min(1, len(data.columns) - 1), key="plot_y"
+        )
+        plot_type = st.selectbox("Plot type", ["Scatter", "Line"], key="plot_type")
+        try:
+            plot_data, omitted = prepare_plot_data(data, x_column, y_column, plot_type)
+        except ValueError as exc:
+            st.warning(str(exc))
+        else:
+            if omitted:
+                st.caption(f"Omitted {omitted:,} rows with a blank X or Y value.")
+            chart = st.scatter_chart if plot_type == "Scatter" else st.line_chart
+            chart(plot_data, x="X", y="Y", x_label=x_column, y_label=y_column)
 
         st.subheader("Data preview")
         st.write(f"Rows: {len(data):,} · Columns: {len(data.columns):,}")

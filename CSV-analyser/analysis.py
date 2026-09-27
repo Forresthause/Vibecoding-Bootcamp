@@ -10,6 +10,51 @@ class CSVValidationError(ValueError):
     """An upload cannot be used; the message can be shown to the user."""
 
 
+def prepare_plot_data(
+    data: pd.DataFrame, x_column: str, y_column: str, plot_type: str
+) -> tuple[pd.DataFrame, int]:
+    """Return numeric X/Y pairs and a count of rows missing either value.
+
+    Validate all nonblank values before dropping incomplete pairs. Line plots
+    require unique X values among complete pairs and are sorted by X.
+    Fixed output names allow the same source column on both axes.
+    The input frame is never modified.
+    """
+    if plot_type not in ("Scatter", "Line"):
+        raise ValueError("Choose Scatter or Line as the plot type.")
+
+    converted = {}
+    for axis, name in (("X", x_column), ("Y", y_column)):
+        if name not in data.columns:
+            raise ValueError(f"Unknown column: {name}")
+        values = data[name].dropna()
+        numbers = pd.to_numeric(values, errors="coerce")
+        if numbers.isna().any():
+            raise ValueError(
+                f"{axis} column '{name}' contains nonnumeric values. "
+                "Choose a numeric column."
+            )
+        if not numbers.map(isfinite).all():
+            raise ValueError(
+                f"{axis} column '{name}' contains non-finite numbers. "
+                "Choose a column with finite numbers."
+            )
+        converted[axis] = numbers.reindex(data.index)
+
+    pairs = pd.DataFrame(converted).dropna()
+    omitted = len(data) - len(pairs)
+    if pairs.empty:
+        raise ValueError("No complete X/Y pairs remain. Choose columns with overlapping numeric values.")
+    if plot_type == "Line":
+        if pairs["X"].duplicated().any():
+            raise ValueError(
+                f"X column '{x_column}' has duplicate values. "
+                "Use Scatter or choose an X column with unique values for Line."
+            )
+        pairs = pairs.sort_values("X")
+    return pairs, omitted
+
+
 def parse_csv(file_bytes: bytes) -> pd.DataFrame:
     """Read a UTF-8, comma-separated CSV whose first row contains headers.
 

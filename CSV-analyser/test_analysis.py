@@ -4,7 +4,7 @@ import unittest
 
 import pandas as pd
 
-from analysis import CSVValidationError, analyze_columns, parse_csv
+from analysis import CSVValidationError, analyze_columns, parse_csv, prepare_plot_data
 
 
 class ParseCSVTests(unittest.TestCase):
@@ -151,6 +151,66 @@ class AnalyzeColumnsTests(unittest.TestCase):
     def test_unknown_column_has_clear_error(self):
         with self.assertRaisesRegex(ValueError, "Unknown column: Missing"):
             analyze_columns(parse_csv(b"Value\n1\n"), ["Missing"])
+
+
+class PreparePlotDataTests(unittest.TestCase):
+    def test_converts_pairs_omits_blanks_and_preserves_original(self):
+        data = parse_csv(b"a,b\n3,1e1\n1,-2.5\n,8\n4,\n")
+        original = data.copy(deep=True)
+        pairs, omitted = prepare_plot_data(data, "a", "b", "Scatter")
+        self.assertEqual(pairs["X"].tolist(), [3, 1])
+        self.assertEqual(pairs["Y"].tolist(), [10, -2.5])
+        self.assertEqual(omitted, 2)
+        pd.testing.assert_frame_equal(data, original)
+
+    def test_rejects_invalid_values_on_either_axis_even_in_incomplete_rows(self):
+        for value in ("text", "NaN", "NA", "$20", "inf", "-inf"):
+            for axis in ("X", "Y"):
+                with self.subTest(value=value, axis=axis):
+                    row = f"{value}," if axis == "X" else f",{value}"
+                    data = parse_csv(f"a,b\n1,2\n{row}\n".encode())
+                    with self.assertRaisesRegex(ValueError, f"{axis} column"):
+                        prepare_plot_data(data, "a", "b", "Scatter")
+
+    def test_rejects_text_only_column(self):
+        data = parse_csv(b"a,b\nAlice,2\nBob,3\n")
+        with self.assertRaisesRegex(ValueError, "nonnumeric"):
+            prepare_plot_data(data, "a", "b", "Scatter")
+
+    def test_rejects_empty_or_nonoverlapping_pairs(self):
+        for content in (b"a,b\n,1\n,2\n", b"a,b\n1,\n,2\n"):
+            with self.subTest(content=content):
+                with self.assertRaisesRegex(ValueError, "No complete X/Y pairs"):
+                    prepare_plot_data(parse_csv(content), "a", "b", "Scatter")
+
+    def test_line_sorts_numerically_and_ignores_incomplete_duplicates(self):
+        data = parse_csv(b"a,b\n10,100\n2,20\n2,\n")
+        pairs, omitted = prepare_plot_data(data, "a", "b", "Line")
+        self.assertEqual(pairs.values.tolist(), [[2, 20], [10, 100]])
+        self.assertEqual(omitted, 1)
+
+    def test_duplicate_x_is_allowed_only_for_scatter(self):
+        data = parse_csv(b"a,b\n1,2\n1.0,3\n")
+        pairs, _ = prepare_plot_data(data, "a", "b", "Scatter")
+        self.assertEqual(len(pairs), 2)
+        with self.assertRaisesRegex(ValueError, "Use Scatter"):
+            prepare_plot_data(data, "a", "b", "Line")
+
+    def test_same_column_on_both_axes_and_single_point(self):
+        data = parse_csv(b"a\n7\n")
+        for plot_type in ("Scatter", "Line"):
+            with self.subTest(plot_type=plot_type):
+                pairs, omitted = prepare_plot_data(data, "a", "a", plot_type)
+                self.assertEqual(pairs.values.tolist(), [[7, 7]])
+                self.assertEqual(omitted, 0)
+
+    def test_rejects_unknown_columns_and_plot_types(self):
+        data = parse_csv(b"a,b\n1,2\n")
+        for x, y in (("missing", "b"), ("a", "missing")):
+            with self.assertRaisesRegex(ValueError, "Unknown column"):
+                prepare_plot_data(data, x, y, "Scatter")
+        with self.assertRaisesRegex(ValueError, "Choose Scatter or Line"):
+            prepare_plot_data(data, "a", "b", "Bar")
 
 
 if __name__ == "__main__":
