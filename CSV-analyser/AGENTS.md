@@ -19,4 +19,4 @@
 - Tests use unittest and live in test_analysis.py.
 - From the repository root: `python3 -m unittest discover -s CSV-analyser -v`.
 - Add regression coverage for changed parsing and analysis behavior.
-- For UI changes, run `streamlit run CSV-analyser/app.py` and check affected flows manually.
+- For UI changes, do not spend significant time attempting browser-based or visual verification. Run inexpensive automated checks where applicable, then tell me exactly what I should manually verify in the UI.

@@ -61,21 +61,28 @@ else:
             "are omitted. Line plots connect points in ascending X order and "
             "require unique X values."
         )
-        x_column = st.selectbox("X column", data.columns.tolist(), key="plot_x")
+        x_column = st.selectbox(
+            "X column", data.columns.tolist(), index=None, key="plot_x"
+        )
         y_column = st.selectbox(
             "Y column", data.columns.tolist(),
-            index=min(1, len(data.columns) - 1), key="plot_y"
+            index=None, key="plot_y"
         )
-        plot_type = st.selectbox("Plot type", ["Scatter", "Line"], key="plot_type")
-        try:
-            plot_data, omitted = prepare_plot_data(data, x_column, y_column, plot_type)
-        except ValueError as exc:
-            st.warning(str(exc))
+        plot_type = st.selectbox(
+            "Plot type", ["Scatter", "Line"], index=None, key="plot_type"
+        )
+        if x_column is None or y_column is None or plot_type is None:
+            st.info("Select X, Y, and a plot type to create a plot.")
         else:
-            if omitted:
-                st.caption(f"Omitted {omitted:,} rows with a blank X or Y value.")
-            chart = st.scatter_chart if plot_type == "Scatter" else st.line_chart
-            chart(plot_data, x="X", y="Y", x_label=x_column, y_label=y_column)
+            try:
+                plot_data, omitted = prepare_plot_data(data, x_column, y_column, plot_type)
+            except ValueError as exc:
+                st.warning(str(exc))
+            else:
+                if omitted:
+                    st.caption(f"Omitted {omitted:,} rows with a blank X or Y value.")
+                chart = st.scatter_chart if plot_type == "Scatter" else st.line_chart
+                chart(plot_data, x="X", y="Y", x_label=x_column, y_label=y_column)
 
         st.subheader("Data preview")
         st.write(f"Rows: {len(data):,} · Columns: {len(data.columns):,}")
