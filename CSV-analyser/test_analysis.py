@@ -101,6 +101,7 @@ class AnalyzeColumnsTests(unittest.TestCase):
         self.assertEqual(result["Count"], 3)
         self.assertEqual(result["Mean"], 4)
         self.assertEqual(result["Median"], 2)
+        self.assertEqual(result["Reason"], "Ignored 2 missing values.")
 
     def test_single_numeric_value(self):
         result = self.analyze_values(["7"])
@@ -113,21 +114,40 @@ class AnalyzeColumnsTests(unittest.TestCase):
             self.analyze_values(["Alice", "Bob", "Alice", ""]), "Text", 3
         )
 
-    def test_mixed_column_does_not_average_numeric_subset(self):
-        self.assert_unavailable(
-            self.analyze_values(["100", "300", "pending"]), "Mixed", 3
-        )
+    def test_mixed_column_uses_numeric_subset_and_reports_exclusions(self):
+        result = self.analyze_values(["100", "300", "pending", ""])
+        self.assertEqual(result["Type"], "Mixed")
+        self.assertEqual(result["Count"], 3)
+        self.assertEqual(result["Min"], 100)
+        self.assertEqual(result["Max"], 300)
+        self.assertEqual(result["Mean"], 200)
+        self.assertEqual(result["Median"], 200)
+        self.assertEqual(result["Reason"], "Ignored 1 nonnumeric value and 1 missing value.")
 
     def test_empty_column(self):
         self.assert_unavailable(self.analyze_values(["", "   "]), "Empty", 0)
 
-    def test_nonfinite_values_do_not_produce_numeric_statistics(self):
+    def test_invalid_values_are_excluded_from_numeric_statistics(self):
         for value in ("inf", "-inf", "NaN", "NA"):
             with self.subTest(value=value):
                 result = self.analyze_values(["1", value])
-                self.assert_unavailable(
-                    result, "Non-finite" if "inf" in value else "Mixed", 2
-                )
+                self.assertEqual(result["Count"], 2)
+                for statistic in ("Min", "Max", "Mean", "Median"):
+                    self.assertEqual(result[statistic], 1)
+                label = "non-finite" if "inf" in value else "nonnumeric"
+                self.assertEqual(result["Reason"], f"Ignored 1 {label} value.")
+
+    def test_no_usable_numbers_reports_all_exclusions(self):
+        result = self.analyze_values(["pending", "", "inf", "-inf"])
+        self.assert_unavailable(result, "Mixed", 3)
+        self.assertEqual(
+            result["Reason"],
+            "Ignored 1 nonnumeric value and 1 missing value and 2 non-finite values. "
+            "No finite numeric values available.",
+        )
+
+    def test_only_infinities_have_no_statistics(self):
+        self.assert_unavailable(self.analyze_values(["inf", "-inf"]), "Non-finite", 2)
 
     def test_formatted_values_are_not_automatically_converted(self):
         for value in ('"1,000"', "$20", "10%", "2026-09-24"):

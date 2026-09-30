@@ -42,8 +42,9 @@ else:
             st.subheader("Analysis results")
             st.caption(
                 "Count includes nonblank values, including duplicates. "
-                "Numeric statistics ignore blanks. N/A means a statistic does not "
-                "apply; see the Note column."
+                "Numeric statistics use only finite numeric cells, ignoring blanks, "
+                "nonnumeric values, and infinities. N/A means no usable numbers "
+                "remain; see the Note column for excluded values."
             )
             # Format a separate display table so numeric results stay unchanged.
             display_results = results.drop(columns=["Type"]).rename(

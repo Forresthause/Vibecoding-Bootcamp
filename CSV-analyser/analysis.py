@@ -98,7 +98,8 @@ def analyze_columns(data: pd.DataFrame, selected_columns: list[str]) -> pd.DataF
     """Summarize selected columns from parse_csv(), preserving selection order.
 
     Count means nonblank cells, including repeated values. Numeric statistics
-    require every nonblank value to be a finite number. Unavailable statistics
+    use only finite numeric cells. Excluded cells are reported in Reason.
+    Unavailable statistics
     are None, with a reason for the UI to display alongside N/A. Results are
     not rounded, and the original data is not modified.
     """
@@ -114,29 +115,44 @@ def analyze_columns(data: pd.DataFrame, selected_columns: list[str]) -> pd.DataF
         result = dict.fromkeys(result_columns)
         result.update(Column=name, Count=len(values), Reason="")
 
+        numbers = pd.to_numeric(values, errors="coerce")
+        missing_count = len(data[name]) - len(values)
+        nonnumeric_count = int(numbers.isna().sum())
+        converted = numbers.dropna()
+        finite = converted.map(isfinite).astype(bool)
+        nonfinite_count = int((~finite).sum())
+        usable = converted[finite]
+
         if values.empty:
-            result.update(Type="Empty", Reason="No values")
+            result["Type"] = "Empty"
+        elif nonnumeric_count:
+            result["Type"] = "Text" if numbers.isna().all() else "Mixed"
+        elif nonfinite_count:
+            result["Type"] = "Non-finite"
         else:
-            # Coercion identifies invalid values; never calculate on a subset
-            # of a mixed column by silently dropping failed conversions.
-            numbers = pd.to_numeric(values, errors="coerce")
-            if numbers.isna().any():
-                result.update(
-                    Type="Text" if numbers.isna().all() else "Mixed",
-                    Reason="Contains nonnumeric values",
-                )
-            elif not numbers.map(isfinite).all():
-                result.update(
-                    Type="Non-finite", Reason="Contains non-finite numbers"
-                )
-            else:
-                result.update(
-                    Type="Numeric",
-                    Max=numbers.max(),
-                    Min=numbers.min(),
-                    Mean=numbers.mean(),
-                    Median=numbers.median(),
-                )
+            result["Type"] = "Numeric"
+
+        exclusions = []
+        for count, label in (
+            (nonnumeric_count, "nonnumeric"),
+            (missing_count, "missing"),
+            (nonfinite_count, "non-finite"),
+        ):
+            if count:
+                exclusions.append(f"{count} {label} value{'s' if count != 1 else ''}")
+        if exclusions:
+            result["Reason"] = "Ignored " + " and ".join(exclusions) + "."
+
+        if usable.empty:
+            result["Reason"] += " No finite numeric values available."
+            result["Reason"] = result["Reason"].strip()
+        else:
+            result.update(
+                Max=usable.max(),
+                Min=usable.min(),
+                Mean=usable.mean(),
+                Median=usable.median(),
+            )
         results.append(result)
 
     return pd.DataFrame(results, columns=result_columns, dtype=object)
