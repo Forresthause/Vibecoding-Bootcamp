@@ -33,8 +33,8 @@ else:
     else:
         st.subheader("Data preview")
         st.write(f"Rows: {len(data):,} · Columns: {len(data.columns):,}")
-        st.caption(f"Showing the first {min(5, len(data))} rows. Blank cells are shown as Missing.")
-        st.dataframe(data.head(5).fillna("Missing"), hide_index=True)
+        st.caption(f"Showing the first {min(5, len(data))} rows.")
+        st.dataframe(data.head(5).fillna(""), hide_index=True)
 
         selected_columns = st.multiselect(
             "Select columns to analyze", data.columns.tolist(), key="selected_columns"
