@@ -54,7 +54,13 @@ else:
                 display_results[statistic] = results[statistic].map(
                     lambda value: "N/A" if value is None else str(value)
                 )
-            st.dataframe(display_results, hide_index=True)
+            st.table(
+                display_results.style.set_properties(
+                    subset=["Note"],
+                    **{"white-space": "normal", "overflow-wrap": "anywhere"},
+                ),
+                hide_index=True,
+            )
 
         st.subheader("Plot")
         st.caption(
