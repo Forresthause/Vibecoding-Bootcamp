@@ -32,25 +32,29 @@ else:
         st.error(str(exc))
     else:
         st.subheader("Data preview")
-        st.write(f"Rows: {len(data):,} · Columns: {len(data.columns):,}")
-        st.caption(f"Showing the first {min(5, len(data))} rows.")
+        st.caption(
+            f"{len(data):,} rows · {len(data.columns):,} columns · "
+            f"Showing first {min(5, len(data))} rows"
+        )
         st.dataframe(data.head(5).fillna(""), hide_index=True)
 
+        st.subheader("Summary statistics")
         selected_columns = st.multiselect(
             "Select columns to analyze", data.columns.tolist(), key="selected_columns"
         )
 
         if not selected_columns:
-            st.info("Select at least one column to see its statistics.")
+            st.caption("Select at least one column to see its statistics.")
         else:
             results = analyze_columns(data, selected_columns)
-            st.subheader("Analysis results")
-            st.caption(
-                "Count includes nonblank values, including duplicates. "
-                "Numeric statistics use only finite numeric cells, ignoring blanks, "
-                "nonnumeric values, and infinities. N/A means no usable numbers "
-                "remain; see the Note column for excluded values."
-            )
+            st.caption("Statistics use finite numeric values; exclusions appear in Note.")
+            with st.expander("How statistics are calculated"):
+                st.write(
+                    "Count includes nonblank values, including duplicates. "
+                    "Numeric statistics use only finite numeric cells, ignoring blanks, "
+                    "nonnumeric values, and infinities. N/A means no usable numbers "
+                    "remain; see the Note column for excluded values."
+                )
             # Format a separate display table so numeric results stay unchanged.
             display_results = results.drop(columns=["Type"]).rename(
                 columns={"Reason": "Note"}
@@ -68,23 +72,26 @@ else:
             )
 
         st.subheader("Plot")
-        st.caption(
-            "Both axes require numeric values. Rows with a blank on either axis "
-            "are omitted. Line plots connect points in ascending X order and "
-            "require unique X values."
-        )
-        x_column = st.selectbox(
+        st.caption("Compare two numeric columns with a scatter or line plot.")
+        with st.expander("How plots are prepared"):
+            st.write(
+                "Both axes require numeric values. Rows with a blank on either axis "
+                "are omitted. Line plots connect points in ascending X order and "
+                "require unique X values."
+            )
+        x_selector, y_selector, type_selector = st.columns(3)
+        x_column = x_selector.selectbox(
             "X column", data.columns.tolist(), index=None, key="plot_x"
         )
-        y_column = st.selectbox(
+        y_column = y_selector.selectbox(
             "Y column", data.columns.tolist(),
             index=None, key="plot_y"
         )
-        plot_type = st.selectbox(
+        plot_type = type_selector.selectbox(
             "Plot type", ["Scatter", "Line"], index=None, key="plot_type"
         )
         if x_column is None or y_column is None or plot_type is None:
-            st.info("Select X, Y, and a plot type to create a plot.")
+            st.caption("Select X, Y, and a plot type to create a plot.")
         else:
             try:
                 plot_data, omitted = prepare_plot_data(data, x_column, y_column, plot_type)
