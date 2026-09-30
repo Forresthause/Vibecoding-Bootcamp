@@ -31,6 +31,11 @@ else:
     except CSVValidationError as exc:
         st.error(str(exc))
     else:
+        st.subheader("Data preview")
+        st.write(f"Rows: {len(data):,} · Columns: {len(data.columns):,}")
+        st.caption(f"Showing the first {min(5, len(data))} rows. Blank cells are shown as Missing.")
+        st.dataframe(data.head(5).fillna("Missing"), hide_index=True)
+
         selected_columns = st.multiselect(
             "Select columns to analyze", data.columns.tolist(), key="selected_columns"
         )
@@ -90,8 +95,3 @@ else:
                     st.caption(f"Omitted {omitted:,} rows with a blank X or Y value.")
                 chart = st.scatter_chart if plot_type == "Scatter" else st.line_chart
                 chart(plot_data, x="X", y="Y", x_label=x_column, y_label=y_column)
-
-        st.subheader("Data preview")
-        st.write(f"Rows: {len(data):,} · Columns: {len(data.columns):,}")
-        st.caption(f"Showing the first {min(10, len(data))} rows. Blank cells are shown as Missing.")
-        st.dataframe(data.head(10).fillna("Missing"), hide_index=True)
